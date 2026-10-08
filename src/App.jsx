@@ -45,6 +45,8 @@ function useMusic() {
   const readyRef = useRef(false);
   const wantRef = useRef(false);
   const [playing, setPlaying] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,10 +60,19 @@ function useMusic() {
         width: 220,
         height: 220,
         videoId: YT_ID,
-        playerVars: { start: YT_START, playsinline: 1, controls: 0, disablekb: 1, rel: 0 },
+        playerVars: {
+          start: YT_START,
+          playsinline: 1,
+          controls: 0,
+          disablekb: 1,
+          rel: 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
+        },
         events: {
           onReady: () => {
             readyRef.current = true;
+            setReady(true);
             if (wantRef.current) {
               playerRef.current.seekTo(YT_START, true);
               playerRef.current.playVideo();
@@ -75,6 +86,7 @@ function useMusic() {
             }
             setPlaying(e.data === S.PLAYING);
           },
+          onError: () => setError(true),
         },
       });
     };
@@ -108,8 +120,12 @@ function useMusic() {
     wantRef.current = true;
     const p = playerRef.current;
     if (p && readyRef.current) {
-      p.seekTo(YT_START, true);
-      p.playVideo();
+      try {
+        p.unMute();
+        p.setVolume(100);
+        p.seekTo(YT_START, true);
+        p.playVideo();
+      } catch (err) { /* ignore */ }
     }
   };
 
@@ -120,15 +136,15 @@ function useMusic() {
     else p.playVideo();
   };
 
-  return { wrapRef, start, toggle, playing };
+  return { wrapRef, start, toggle, playing, ready, error };
 }
 
-function EnterGate({ onEnter, hidden }) {
+function EnterGate({ onEnter, hidden, ready }) {
   return (
     <div className={`gate ${hidden ? 'gate-hidden' : ''}`}>
-      <button className="gate-btn" onClick={onEnter} aria-label="შესვლა">
+      <button className="gate-btn" onClick={onEnter} disabled={!ready} aria-label="შესვლა">
         <span className="gate-heart">♥</span>
-        <span className="gate-text">შეეხე</span>
+        <span className="gate-text">{ready ? 'შეეხე' : '...'}</span>
       </button>
     </div>
   );
@@ -400,6 +416,12 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [entered, setEntered] = useState(false);
   const music = useMusic();
+  const [waited, setWaited] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setWaited(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   const enter = () => {
     music.start();
@@ -426,7 +448,7 @@ export default function App() {
       <style>{CSS}</style>
       <div className="progress" style={{ width: `${progress}%` }} />
       <div ref={music.wrapRef} className="yt-hidden" aria-hidden="true" />
-      <EnterGate onEnter={enter} hidden={entered} />
+      <EnterGate onEnter={enter} hidden={entered} ready={music.ready || waited} />
       {entered && <EntryBurst />}
       {entered && (
         <button
@@ -434,7 +456,7 @@ export default function App() {
           onClick={music.toggle}
           aria-label="მუსიკა"
         >
-          {music.playing ? '♫' : '▶'}
+          {music.error ? '✕' : music.playing ? '♫' : '▶'}
         </button>
       )}
       <BackgroundHearts />
@@ -636,7 +658,9 @@ main { position: relative; z-index: 1; }
 }
 
 /* Music + gate */
-.yt-hidden { position: fixed; left: -9999px; top: 0; width: 220px; height: 220px; pointer-events: none; }
+.yt-hidden { position: fixed; left: 0; bottom: 0; width: 220px; height: 220px; opacity: 0.01; pointer-events: none; z-index: -1; overflow: hidden; }
+.yt-hidden iframe { width: 220px; height: 220px; }
+.gate-btn:disabled { cursor: wait; opacity: 0.6; }
 
 .gate {
   position: fixed; inset: 0; z-index: 100;
