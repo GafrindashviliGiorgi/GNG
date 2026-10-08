@@ -464,7 +464,7 @@ export default function App() {
       <main>
         <section className="section top">
           <Reveal>
-            <p className="since">3 ოქტომბრიდან 19:40-დან ერთად ✦</p>
+            <p className="since">3 ოქტომბრიდან ერთად ✦</p>
           </Reveal>
           <Reveal delay={150}>
             <Counter />
